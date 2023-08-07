@@ -1,21 +1,36 @@
 # The language for scripting data language
 
+Basic ideas:
+* All common APIs should be built in and not even require an import, let alone downloading a library. For example:
+  * Interacting with files (CSV, Parquet, Avro, JSON, Excel, etc.)
+  * Interacting with databases (Postgres, SQL Server, etc.)
+  * Interacting with the web (e.g. HTTP)
+  * Interacting with dates, URLs, etc.
+  * Doing statistics
+* Builtin libraries are prefixed with @
+* Parenthesis are optional for function calls except where necessary for disambiguation (similar to the ML family)
+* Function arguments must be keyword-named, except for the first argument which can be anonymous (similar to Swift/Objective C)
+* A function that takes no arguments is called where it is typed. To prevent this, use &. Such as for reassigning a function to another name.
+* Everything is statically type-checked.
+* Ruby-style symbols are prefixed with a `.` (similar to Zig).
+* Code will be compiled to C via TCC for fast compilation speed, then immediately executed
+
 ### API Interactions
 
 ```jsx
 next_page = "github.com/eatonphil/goraft/stars";
 for next_page != "" {
-	req = @http.get next;
+  req = @http.get next;
 	
-	stars_by_date = {};
+  stars_by_date = {};
 	
-	for star in req.json.stars {
-	  stars_by_date.incr star.date
-	}
+  for star in req.json.stars {
+    stars_by_date.incr star.date
+  }
 	
-	for date, count in stars_by_date {
-	  print `${date} ${count}`
-	}
+  for date, count in stars_by_date {
+    print `${date} ${count}`
+  }
 
   next_page = req.headers["X_NEXT_URL"]
 }
