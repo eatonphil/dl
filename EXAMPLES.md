@@ -56,7 +56,7 @@ fn build_css {
 
 commands = {
   "runner": &rebuild_runner,
-  "css": &css,
+  "css": &rebuild_css,
 };
 for arg in @proc.args {
   if arg in commands {
