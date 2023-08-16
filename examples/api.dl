@@ -1,0 +1,16 @@
+next_page = "github.com/eatonphil/goraft/stars"
+for next_page != "" {
+  req = @http.get(next)
+	
+  stars_by_date = {}
+	
+  for star in req.json.stars {
+    stars_by_date.incr(star.date)
+  }
+	
+  for date, count in stars_by_date {
+    print(`${date} ${count}`)
+  }
+
+  next_page = req.headers["X_NEXT_URL"]
+}

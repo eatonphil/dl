@@ -1,4 +1,4 @@
-# The language for scripting data language
+# The language for scripting data
 
 Basic ideas:
 * All common APIs should be built in and not even require an import, let alone downloading a library. For example:
@@ -18,67 +18,76 @@ Basic ideas:
 ### API Interactions
 
 ```jsx
-next_page = "github.com/eatonphil/goraft/stars";
-for next_page != "" {
-  req = @http.get next;
-	
-  stars_by_date = {};
-	
-  for star in req.json.stars {
-    stars_by_date.incr star.date
-  }
-	
-  for date, count in stars_by_date {
-    print `${date} ${count}`
+page = 1
+for {
+  req = @http.get(
+    `https://api.github.com/repos/neovim/neovim?per_page=100&page=${page}`,
+    headers=[
+      {.accept: "application/vnd.github.star+json"},
+      {.authorization: `Bearer ${@proc.env.GITHUB_TOKEN}`},
+    ],
+  )
+  results = req.json()
+
+  stars_by_date = {}
+
+  for star in results {
+    stars_by_date.incr(@date.parse(star.starred_at, format=.RFC3339).day)
   }
 
-  next_page = req.headers["X_NEXT_URL"]
+  for date, count in stars_by_date {
+    print(`${date} ${count}`)
+  }
+
+  if results.len < 100 {
+    break
+  }
 }
 ```
 
 ### FileSystem Interactions
 
 ```jsx
-fw = @fs.open "mass.csv" mode=.write;
-defer fw.close;
+fw = @fs.open("mass.csv", mode=.write)
+defer fw.close
 
-for file in @fs.list glob=`${@fs.cwd}/data/*.csv` {
-  fw.append file=file
+for file in @fs.list(glob=`${@fs.cwd}/data/*.csv`) {
+  fw.append(file=file)
 }
 ```
 
 ### Build System
 
 ```jsx
-fn rebuild_runner {
-  sources = @fs.list glob="src/*.c";
-  if @fs.cache.miss files=sources key="c-sources" {
-    args = sources;
-    args.push proc.env.C_FLAGS;
-    args.push many=["-o", "bin/runner" + @platform.os == "windows" ? ".exe" : ""];
-    @proc.exec proc.env.CC args=args;
+fn rebuild_runner() {
+  sources = @fs.list(glob="src/*.c")
+  if @fs.cache.miss(files=sources, key="c-sources") {
+    args = sources
+    args.push(@proc.env.C_FLAGS)
+    args.push(many=["-o", "bin/runner" + @platform.os == "windows" ? ".exe" : ""])
+    @proc.exec(@proc.env.CC, args=args)
   }
 }
 
 fn build_css {
-  sources = @fs.list glob="src/**/*.css";
-  if @fs.cache.miss files=sources key="css-sources" {
-    args = sources;
-    args.push ["-o", "out/style.css"];
-    @proc.exec "scss" args=args;
+  sources = @fs.list(glob="src/**/*.css")
+  if @fs.cache.miss(files=sources, key="css-sources") {
+    args = sources
+    args.push(many=["-o", "out/style.css"])
+    @proc.exec("scss", args=args)
   }
 }
 
 commands = {
-  "runner": &rebuild_runner,
-  "css": &rebuild_css,
-};
+  "runner": rebuild_runner,
+  "css": rebuild_css,
+}
 for arg in @proc.args {
   if arg in commands {
-    commands[arg].call;
+    commands[arg]()
   } else {
-    options = commands.keys.join ", ";
-    @proc.exit `Unknown command: ${arg}. Expected one of ${options}.`;
+    options = commands.keys().join(", ");
+    @proc.exit(`Unknown command: ${arg}. Expected one of ${options}.`)
   }
 }
 ```
@@ -86,50 +95,45 @@ for arg in @proc.args {
 ### Benchmarking
 
 ```jsx
-N = 10;
-to_run = [];
+N = @proc.parsed_args.times or @proc.parsed_args.n or 10
+to_run = []
 for arg in @proc.args {
-  if arg == "-n" or arg == "--times" {
-    n = @proc.args.next;
-    continue
-  }
-
   if arg.startswith "-" {
     continue
   }
 
-  program.push arg; 
+  program.push(arg)
 }
 
 for i, prog in to_run {
   if i > 0 {
-    print "\n\n";
+    print("\n\n")
   }
 
-  stats = @math.stats_stream metrics=.min | .max | .stddev | .median;
+  stats = @math.stats_stream(metrics=.min | .max | .stddev | .median)
   for range N {
-    name = prog.part " " at=0;
-    before = @time.now;
-    @proc.exec name args=(prog.slice prog.part from=name.len);
-    after = time.now;
-    stats.update (after.diff before as=.seconds);
+    name = prog.part(" ", at=0)
+    before = @time.now()
+    @proc.exec(name, args=prog.slice(prog.part, from=name.len))
+    after = time.now()
+    stats.update(after.diff(before, as=.seconds))
   }
 
-  print `Program: ${prog}`;
-  print `  Median: ${stats.median}s, Standard Deviation: ${stats.stddev}s`;
-  print `  Min: ${stats.min}s, Max: ${stats.max}s`;
+  print(`Program: ${prog}`)
+  print(`  Median: ${stats.median}s, Standard Deviation: ${stats.stddev}s`)
+  print(`  Min: ${stats.min}s, Max: ${stats.max}s`)
 }
 ```
 
 ### Database Interactions
 
 ```jsx
-conn = @db.conn
+conn = @db.conn(
   driver=.pg
   username=proc.env.PG_USERNAME
   password=proc.env.PG_PASSWORD
-  database=proc.env.PG_DATABASE
-rows = conn.query `
+  database=proc.env.PG_DATABASE)
+rows = conn.query(`
 SELECT
   category, COUNT(1)
 FROM
@@ -137,9 +141,9 @@ FROM
 GROUP BY
   category
 ORDER BY
-  category DESC`
+  category DESC`)
 
 for row in rows {
-  print `Category: ${row.category.text}, Total: ${row.total.u64}`;
+  print(`Category: ${row.category.text}, Total: ${row.total.u64}`);
 }
 ```
